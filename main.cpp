@@ -13,7 +13,7 @@ const long ARRAY_SIZE = ROWS * COLS;
 
 int min(int col, const int * array){
     int min_val = 255;
-    //#pragma omp parallel for reduction(min: min_val)
+    #pragma omp parallel for reduction(min: min_val)
     for(int i = 0; i < ROWS; i++){
         int index = (i*784) + col;
         if (min_val > array[index]){
@@ -26,7 +26,7 @@ int min(int col, const int * array){
 
 int max(int col, const int * array){
     int max_val = 0;
-    //#pragma omp parallel for reduction(max: max_val)
+    #pragma omp parallel for reduction(max: max_val)
     for(int i = 0; i < ROWS; i++){
         int index = (i*784) + col;
         if (max_val < array[index]){
@@ -105,6 +105,22 @@ void print_col(int col, int * array){
 }
 
 
+void euclidian(const double * array, const double * new_array){
+    double sum = 0;
+
+    #pragma omp parallel for reduction (+:sum) collapse(2)
+    for(int i = 0; i < ROWS; i++){
+        for (int j = 0; j < COLS; ++j) {
+            int index = (i*784) + j;
+            sum += (array[index] - new_array[j]) * (array[index]  - new_array[j]);
+        }
+    }
+
+
+}
+
+
+
 
 int main() {
 
@@ -112,31 +128,33 @@ int main() {
     ifstream input("mnist_train.csv");
 
     auto * array = new int[ARRAY_SIZE];
+    auto * classes = new int[ROWS];
     string foo;
     getline( input, foo );
 
     cout << ARRAY_SIZE << endl;
 
     int j = 0;
+    int i = 0;
     for(string line; getline( input, line ); ){
-        stringstream stream(line.substr(2, line.size() - 1));
+        stringstream stream(line.substr(0, line.size() - 1));
         string digit;
+        getline(stream, digit, ',');
+        classes[i] = strtol(digit.c_str(), nullptr, 0);
         while( getline(stream, digit, ',') ) {
             array[j] = strtol(digit.c_str(), nullptr, 0);
             j++;
         }
+        i++;
     }
 
-//    j=0;
-//    for(int i = 0; i < ROWS; i++){
-//        for(int k = 0; k < COLS; k++){
-//            cout << array[j] << " ";
-//            j++;
-//        }
-//        cout << endl;
-//    }
 
-//    print_col(60, array);
+
+    for(int k = 0; k < ROWS; k++){
+        cout << classes[k] << "\n";
+    }
+
+    print_col(0, array);
     cout << max(60, array) << endl;
 
     input.close();
