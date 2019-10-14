@@ -11,9 +11,10 @@ const int ROWS = 60000;
 const int COLS = 784;
 const long ARRAY_SIZE = ROWS * COLS;
 
+
 int min(int col, const int * array){
     int min_val = 255;
-    #pragma omp parallel for reduction(min: min_val)
+    #pragma omp parallel for reduction(min: min_val) num_threads(4)
     for(int i = 0; i < ROWS; i++){
         int index = (i*784) + col;
         if (min_val > array[index]){
@@ -26,7 +27,7 @@ int min(int col, const int * array){
 
 int max(int col, const int * array){
     int max_val = 0;
-    #pragma omp parallel for reduction(max: max_val)
+    #pragma omp parallel for reduction(max: max_val) num_threads(4)
     for(int i = 0; i < ROWS; i++){
         int index = (i*784) + col;
         if (max_val < array[index]){
@@ -45,7 +46,7 @@ double * minMaxNormalization(int col, const int * array){
 
     auto * normalizedArray = new double[ARRAY_SIZE];
 
-    #pragma omp parallel for
+    #pragma omp parallel for num_threads(4)
     for(int i = 0; i < ROWS; i++){
         int index = (i*784) + col;
         normalizedArray[index] = (array[index] - min_val) / denominator;
@@ -57,7 +58,7 @@ double * minMaxNormalization(int col, const int * array){
 double mean(int col, const int * array){
     double sum = 0;
 
-    #pragma omp parallel for reduction (+:sum)
+    #pragma omp parallel for reduction (+:sum) num_threads(4)
     for(int i = 0; i < ROWS; i++){
         int index = (i*784) + col;
         sum += array[index];
@@ -70,7 +71,7 @@ double deviation(int col, const int * array){
     double sum = 0;
     const double mean_val = mean(col, array);
 
-    #pragma omp parallel for reduction (+:sum)
+    #pragma omp parallel for reduction (+:sum) num_threads(4)
     for(int i = 0; i < ROWS; i++){
         int index = (i*784) + col;
         sum += (array[index] - mean_val) * (array[index] - mean_val);
@@ -85,7 +86,7 @@ double * standardization(int col, const int * array){
 
     auto * standardizedArray = new double[ARRAY_SIZE];
 
-    #pragma omp parallel for
+    #pragma omp parallel for num_threads(4)
     for(int i = 0; i < ROWS; i++){
         int index = (i*784) + col;
         standardizedArray[index] = (array[index] - mean_val) / deviation_val;
@@ -93,6 +94,7 @@ double * standardization(int col, const int * array){
 
     return standardizedArray;
 }
+
 
 void print_col(int col, int * array){
     for(int i = 0; i < ROWS; i++){
@@ -107,8 +109,9 @@ void print_col(int col, int * array){
 
 void euclidian(const double * array, const double * new_array){
     double sum = 0;
+    auto * votes = new double[10];
 
-    #pragma omp parallel for reduction (+:sum) collapse(2)
+    #pragma omp parallel for reduction (+:sum) collapse(2) num_threads(4)
     for(int i = 0; i < ROWS; i++){
         for (int j = 0; j < COLS; ++j) {
             int index = (i*784) + j;
@@ -116,19 +119,11 @@ void euclidian(const double * array, const double * new_array){
         }
     }
 
-
 }
 
-
-
-
-int main() {
-
-
+void readData(int * array, int * classes){
     ifstream input("mnist_train.csv");
 
-    auto * array = new int[ARRAY_SIZE];
-    auto * classes = new int[ROWS];
     string foo;
     getline( input, foo );
 
@@ -148,16 +143,40 @@ int main() {
         i++;
     }
 
-
-
-    for(int k = 0; k < ROWS; k++){
-        cout << classes[k] << "\n";
-    }
-
-    print_col(0, array);
-    cout << max(60, array) << endl;
-
     input.close();
+}
+
+
+int main() {
+
+
+    auto * array = new int[ARRAY_SIZE];
+    auto * classes = new int[ROWS];
+
+    readData(array, classes);
+
+
+    double start_time = omp_get_wtime();
+
+    cout << deviation(60, array) << endl;
+
+    double time = omp_get_wtime() - start_time;
+
+    std::cout << time << "\n";
+
+//    long a = 7;
+//    double start_time = omp_get_wtime();
+//    #pragma omp parallel for private(a) num_threads(4) collapse(2)
+//    for(int i=0;i<100000;i++) {
+//        for(int j=0;j<100000;j++) {
+//            a++;
+//        }
+//    }
+//
+//    double time = omp_get_wtime() - start_time;
+//
+//    std::cout << time << "\n";
+
 
     return 0;
 }
