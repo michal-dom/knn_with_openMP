@@ -4,10 +4,10 @@
 #include <omp.h>
 #include <stdio.h>
 #include <math.h>
+
 #define NUM_THREADS 4
 
 using namespace std;
-
 
 const int ROWS = 60000;
 const int COLS = 784;
@@ -28,6 +28,7 @@ int min(const int col, const int * array){
 
 int max(const int col, const int * array){
     int max_val = 0;
+
     #pragma omp parallel for reduction(max: max_val) num_threads(NUM_THREADS)
     for(int i = 0; i < ROWS; i++){
         int index = (i*COLS) + col;
@@ -121,14 +122,10 @@ void print_arr(double * array){
 }
 
 int euclidian(const double * array, const double * test_array, const int * classes){
-//    double sum = 0;
-//    auto * votes = new double[10];
     auto * distances = new double[ROWS];
-
 
     double distance = 100000.0;
 
-//    #pragma omp parallel for reduction (+:sum) collapse(2) num_threads(4)
     #pragma omp parallel for num_threads(NUM_THREADS) shared(distances)
     for(int i = 0; i < ROWS; i++){
         double sum = 0;
@@ -147,8 +144,6 @@ void readData(int * array, int * classes){
 
     string foo;
     getline( input, foo );
-
-//    cout << ARRAY_SIZE << endl;
 
     int j = 0;
     int i = 0;
@@ -199,24 +194,6 @@ int main() {
     double time = omp_get_wtime() - start_time;
     std::cout << time << "\n";
 
-
-
-//    print_arr(normalizedArray);
-
-//    print_arr(array);
-
-//    long a = 7;
-//    double start_time = omp_get_wtime();
-//    #pragma omp parallel for private(a) num_threads(4) collapse(2)
-//    for(int i=0;i<100000;i++) {
-//        for(int j=0;j<100000;j++) {
-//            a++;
-//        }
-//    }
-//
-//    double time = omp_get_wtime() - start_time;
-//
-//    std::cout << time << "\n";
 
 
     return 0;
