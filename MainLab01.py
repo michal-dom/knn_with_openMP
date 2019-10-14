@@ -11,6 +11,12 @@ def readcsv(filename):
     data = pd.read_csv(filename)
     return np.array(data)
 
+def getClassesFromFile(data):
+    classesList = []
+    for item in data:
+        classesList.append(item[0])
+    return classesList
+
 def standarization(data):
     scaler = StandardScaler()
     scaler.fit(data)
@@ -32,6 +38,9 @@ def KNN(X, y):
 
 if __name__ == "__main__":
     data = readcsv("mnist_train.csv")
-    y = 'classes'  # to do - get classes from csv
-    KNN(standarization(data), y)
+    # print(data)ariterate
+    #  iterate
+    #  to do - get classes from csv
+    # KNN(standarization(data), y)
+    y = getClassesFromFile(data)
     KNN(minMax(data), y)
