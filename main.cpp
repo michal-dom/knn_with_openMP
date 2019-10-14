@@ -101,37 +101,15 @@ void standardization(int col, const int * array, double * standardizedArray){
 
 }
 
-void print_col(int col, int * array){
-    for(int i = 0; i < ROWS; i++){
-        int index = (i*COLS) + col;
-        if(array[index] > 0){
-            cout << array[index] << endl;
-        }
-
-    }
-}
-
-
-void print_arr(int * array){
-    long k = 0;
-    for(int i = 0; i < ROWS; i++){
-        for(int j = 0; j < COLS; j++){
-            cout << array[k] << " ";
-            k++;
-        }
-        cout << endl;
-    }
-}
-
 int euclidian(const double * array, const double * test_array, const int * classes){
 
     double min_dist = 10000.0;
     int best_class = 0;
 
-//    #pragma omp parallel for num_threads(NUM_THREADS) reduction(min: min_dist, best_class)
+    #pragma omp parallel for num_threads(NUM_THREADS) reduction(min: min_dist, best_class)
     for(int i = 0; i < ROWS; i++){
         double sum = 0;
-//        #pragma omp parallel for reduction (+:sum) num_threads(NUM_THREADS)
+        #pragma omp parallel for reduction (+:sum) num_threads(NUM_THREADS)
         for (int j = 0; j < COLS; j++) {
             int index = (i*COLS) + j;
             sum += (array[index] - test_array[j]) * (array[index]  - test_array[j]);
