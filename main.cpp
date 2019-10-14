@@ -5,14 +5,16 @@
 #include <stdio.h>
 #include <math.h>
 
-#define NUM_THREADS 4
+#define NUM_THREADS 3
 
 using namespace std;
 
-const int ROWS = 60000;
+int ROWS = 2000;
 const int COLS = 784;
 const long ARRAY_SIZE = ROWS * COLS;
 
+const int ROWS_TEST = 1000;
+const long TEST_SIZE = ROWS * COLS;
 
 int min(const int col, const int * array){
     int min_val = 255;
@@ -110,7 +112,7 @@ void print_col(int col, int * array){
 }
 
 
-void print_arr(double * array){
+void print_arr(int * array){
     long k = 0;
     for(int i = 0; i < ROWS; i++){
         for(int j = 0; j < COLS; j++){
@@ -122,25 +124,30 @@ void print_arr(double * array){
 }
 
 int euclidian(const double * array, const double * test_array, const int * classes){
-    auto * distances = new double[ROWS];
 
-    double distance = 100000.0;
+    double min_dist = 10000.0;
+    int best_class = 0;
 
-    #pragma omp parallel for num_threads(NUM_THREADS) shared(distances)
+//    #pragma omp parallel for num_threads(NUM_THREADS) reduction(min: min_dist, best_class)
     for(int i = 0; i < ROWS; i++){
         double sum = 0;
-        #pragma omp parallel for reduction (+:sum) num_threads(NUM_THREADS)
+//        #pragma omp parallel for reduction (+:sum) num_threads(NUM_THREADS)
         for (int j = 0; j < COLS; j++) {
             int index = (i*COLS) + j;
             sum += (array[index] - test_array[j]) * (array[index]  - test_array[j]);
         }
-        distances[i] = sqrt(sum);
+        double tmp = sqrt(sum);
+        if(tmp < min_dist){
+            min_dist = tmp;
+            best_class = classes[i];
+        }
     }
+    return best_class;
 
 }
 
 void readData(int * array, int * classes){
-    ifstream input("mnist_train.csv");
+    ifstream input("mnist_train3.csv");
 
     string foo;
     getline( input, foo );
@@ -152,6 +159,27 @@ void readData(int * array, int * classes){
         string digit;
         getline(stream, digit, ',');
         classes[i] = strtol(digit.c_str(), nullptr, 0);
+        while( getline(stream, digit, ',') ) {
+            array[j] = strtol(digit.c_str(), nullptr, 0);
+            j++;
+        }
+        i++;
+    }
+
+    input.close();
+}
+
+void readTest(int * array, int * classes){
+    ifstream input("mnist_test.csv");
+
+    int j = 0;
+    int i = 0;
+    for(string line; getline( input, line ); ){
+        stringstream stream(line.substr(0, line.size() - 1));
+        string digit;
+        getline(stream, digit, ',');
+        classes[i] = strtol(digit.c_str(), nullptr, 0);
+
         while( getline(stream, digit, ',') ) {
             array[j] = strtol(digit.c_str(), nullptr, 0);
             j++;
@@ -178,23 +206,70 @@ void standarize(const int * array, double * normalizedArray){
     }
 }
 
+void classify(double * standardizedData, double * test2D[ROWS_TEST], int * classesData, int * classesTest){
+
+    ROWS = 2000;
+    int hits = 0;
+
+    #pragma omp parallel for num_threads(NUM_THREADS) reduction(+:hits)
+    for (int i = 0; i < ROWS_TEST; ++i) {
+        double * tmp = test2D[i];
+        int pred = euclidian(standardizedData, tmp, classesData);
+        if(pred == classesTest[i]){
+            hits++;
+        }
+    }
+
+    double score = (double) hits / ROWS_TEST;
+
+//    cout << score << endl;
+}
 
 int main() {
 
 
-    auto * array = new int[ARRAY_SIZE];
-    auto * normalizedArray = new double[ARRAY_SIZE];
-    auto * standardizedArray = new double[ARRAY_SIZE];
-    auto * classes = new int[ROWS];
+    auto * data = new int[ARRAY_SIZE];
+    auto * normalizedData = new double[ARRAY_SIZE];
+    auto * standardizedData = new double[ARRAY_SIZE];
+    auto * classesData = new int[ROWS];
 
-    readData(array, classes);
+
+    auto * test = new int[TEST_SIZE];
+    auto * normalizedTest = new double[TEST_SIZE];
+    auto * standardizedTest = new double[TEST_SIZE];
+    auto * classesTest = new int[ROWS_TEST];
+
+
+
+    readData(data, classesData);
+    readTest(test, classesTest);
+
+
+    standarize(data, standardizedData);
+    ROWS = ROWS_TEST;
+    standarize(test, standardizedTest);
+
+    double * test2D[ROWS_TEST];
+
+
+
+
+    int k = 0;
+    for (auto & i : test2D) {
+        auto * tmp = new double[COLS];
+        for (int j = 0; j < COLS; ++j) {
+            tmp[j] = standardizedTest[k];
+            k++;
+        }
+        i = tmp;
+    }
+
 
     double start_time = omp_get_wtime();
-    standarize(array, normalizedArray);
+    classify(standardizedData, test2D, classesData, classesTest);
+
     double time = omp_get_wtime() - start_time;
     std::cout << time << "\n";
-
-
 
     return 0;
 }
