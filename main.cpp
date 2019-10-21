@@ -42,20 +42,20 @@ void standarize(const int * array, double * normalizedArray){
 
 int euclidian(double * train, double * test, int testRow){
 
-    auto min = DBL_MAX;
+    auto minVal = DBL_MAX;
     int classIndex = 0;
-//    #pragma omp parallel for num_threads(NUM_THREADS) private(classIndex, min)
+    #pragma omp parallel for num_threads(NUM_THREADS) shared(classIndex) reduction(min: minVal)
     for(int i = 0; i < ROWS; i++){
         double sum = 0.0;
-//        #pragma omp parallel for num_threads(NUM_THREADS) private(sum)
+        #pragma omp parallel for num_threads(NUM_THREADS) reduction(+: sum)
         for(int j = 0; j < COLS; j++){
             int indexTrain = 784*i + j;
             int indexTest = 784*testRow + j;
             sum += (train[indexTrain] - test[indexTest]) * (train[indexTrain] - test[indexTest]);
         }
         sum = sqrt(sum);
-        if(min > sum){
-            min = sum;
+        if(minVal > sum){
+            minVal = sum;
             classIndex = i;
         }
     }
@@ -66,7 +66,7 @@ void knn(double * train, double * test, const int * classesTrain, const int * cl
 
 
     auto hits = 0;
-//    #pragma omp parallel for reduction(+: hits) num_threads(NUM_THREADS) shared(train, test, classesTrain, classesTest)
+    #pragma omp parallel for reduction(+: hits) num_threads(NUM_THREADS) shared(train, test, classesTrain, classesTest)
     for(int i = 0; i < 2000; i++){
         int predClass = classesTrain[euclidian(train, test, i)];
         if(predClass == classesTest[i]){
