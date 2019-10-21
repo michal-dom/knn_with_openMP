@@ -4,127 +4,23 @@
 #include <omp.h>
 #include <stdio.h>
 #include <math.h>
+#include <cfloat>
+
 #include "Utils.h"
+#include "StandScaler.h"
+#include "NormScaler.h"
 
 #define NUM_THREADS 3
+#define ROWS 8000
+#define COLS 784
 
 using namespace std;
 
-int ROWS = 60000;
-const int COLS = 784;
+
 const long ARRAY_SIZE = ROWS * COLS;
 
-const int ROWS_TEST = 1000;
-const long TEST_SIZE = ROWS * COLS;
-
-int min(const int col, const int * array){
-    int min_val = 255;
-    #pragma omp parallel for reduction(min: min_val) num_threads(NUM_THREADS)
-    for(int i = 0; i < ROWS; i++){
-        int index = (i*COLS) + col;
-        if (min_val > array[index]){
-            min_val = array[index];
-        }
-    }
-    return min_val;
-}
-
-int max(const int col, const int * array){
-    int max_val = 0;
-
-    #pragma omp parallel for reduction(max: max_val) num_threads(NUM_THREADS)
-    for(int i = 0; i < ROWS; i++){
-        int index = (i*COLS) + col;
-        if (max_val < array[index]){
-            max_val = array[index];
-        }
-    }
-    return max_val;
-}
-
-void minMaxNormalization(const int col, const int * array, double * normalizedArray){
-
-    const int min_val = min(col, array);
-    const int max_val = max(col, array);
-    const double denominator = max_val - min_val;
-
-    #pragma omp parallel for num_threads(NUM_THREADS) shared(normalizedArray)
-    for(int i = 0; i < ROWS; i++){
-        int index = (i*COLS) + col;
-        if(denominator == 0){
-            normalizedArray[index] = 0;
-        } else {
-            normalizedArray[index] = (array[index] - min_val) / denominator;
-        }
-    }
-}
-
-double mean(const int col, const int * array){
-    double sum = 0;
-
-    #pragma omp parallel for reduction (+:sum) num_threads(NUM_THREADS)
-    for(int i = 0; i < ROWS; i++){
-        int index = (i*COLS) + col;
-        sum += array[index];
-    }
-
-    return sum / ROWS;
-}
-
-double deviation(int col, const int * array){
-    double sum = 0;
-    const double mean_val = mean(col, array);
-
-    #pragma omp parallel for reduction(+:sum) num_threads(NUM_THREADS)
-    for(int i = 0; i < ROWS; i++){
-        int index = (i*COLS) + col;
-        sum += (array[index] - mean_val) * (array[index] - mean_val);
-    }
-    double variance = sum / ROWS;
-    return sqrt(variance);
-}
-
-void standardization(int col, const int * array, double * standardizedArray){
-    const double mean_val = mean(col, array);
-    const double deviation_val = deviation(col, array);
-
-    #pragma omp parallel for num_threads(NUM_THREADS)
-    for(int i = 0; i < ROWS; i++){
-
-        int index = (i*COLS) + col;
-        if(deviation_val == 0){
-            standardizedArray[index] = 0;
-        } else{
-            standardizedArray[index] = (array[index] - mean_val) / deviation_val;
-
-        }
-    }
-
-}
-
-int euclidian(const double * array, const double * test_array, const int * classes){
-
-    double min_dist = 10000.0;
-    int best_class = 0;
-
-//    #pragma omp parallel for num_threads(NUM_THREADS) reduction(min: min_dist, best_class)
-    for(int i = 0; i < ROWS; i++){
-        double sum = 0;
-//        #pragma omp parallel for reduction (+:sum) num_threads(NUM_THREADS)
-        for (int j = 0; j < COLS; j++) {
-            int index = (i*COLS) + j;
-            sum += (array[index] - test_array[j]) * (array[index]  - test_array[j]);
-        }
-        double tmp = sqrt(sum);
-        if(tmp < min_dist){
-            min_dist = tmp;
-            best_class = classes[i];
-        }
-    }
-    return best_class;
-
-}
-
+const long DATA_SIZE = 8000 * 784;
+const long TEST_SIZE = 2000 * 784;
 
 
 
@@ -144,103 +40,63 @@ void standarize(const int * array, double * normalizedArray){
     }
 }
 
-void classify(double * standardizedData, double * test2D[ROWS_TEST], int * classesData, int * classesTest){
+int euclidian(double * train, double * test, int testRow){
 
-    ROWS = 2000;
-    int hits = 0;
+    auto min = 1000000.0;
+    int classIndex = 0;
+    for(int i = 0; i < ROWS; i++){
+        double sum = 0.0;
 
-    #pragma omp parallel for num_threads(NUM_THREADS) reduction(+:hits)
-    for (int i = 0; i < ROWS_TEST; ++i) {
-        double * tmp = test2D[i];
-        int pred = euclidian(standardizedData, tmp, classesData);
-        if(pred == classesTest[i]){
+        for(int j = 0; j < COLS; j++){
+            int indexTrain = 784*i + j;
+            int indexTest = 784*testRow + j;
+            sum += (train[indexTrain] - test[indexTest]) * (train[indexTrain] - test[indexTest]);
+        }
+        sum = sqrt(sum);
+        if(min > sum){
+            min = sum;
+            classIndex = i;
+        }
+    }
+    return classIndex;
+}
+
+void knn(double * train, double * test, int * classesTrain, int *  classesTest){
+
+
+    auto hits = 0;
+    for(int i = 0; i < 2000; i++){
+        int predClass = classesTrain[euclidian(train, test, i)];
+        if(predClass == classesTest[i]){
             hits++;
         }
     }
 
-    double score = (double) hits / ROWS_TEST;
+    double accuracy = (double) hits;
+    accuracy = accuracy/20;
 
-//    cout << score << endl;
+    cout << "Classifier accuracy is " << accuracy << "%." << endl;
+
 }
-void writeFile(const double * array){
-    ofstream file;
-    file.open("processed.csv");
-
-    long k = 0;
-    for(int i = 0; i < ROWS; i++){
-        for(int j = 0; j < COLS; j++){
-            file << array[k] << ",";
-            k++;
-        }
-        file << endl;
-    }
-    file.close();
-}
-
-void readTrainData(double * array){
-    ifstream input("processed_minMax.csv");
-
-    int j = 0;
-    int i = 0;
-    for(string line; getline( input, line ); ){
-        stringstream stream(line.substr(0, line.size() - 1));
-        string digit;
-        while( getline(stream, digit, ',') ) {
-            array[j] = strtod(digit.c_str(), nullptr);
-            j++;
-        }
-        i++;
-    }
-
-    input.close();
-}
-
-
-void saveClasses(int * array){
-    ofstream file;
-    file.open("classes.txt");
-
-    for(int i = 0; i < ROWS; i++){
-        file << array[i] << "\n";
-    }
-    file.close();
-}
-
-
 
 int main() {
 
 
-    auto * data = new int[ARRAY_SIZE];
-    auto * normalizedData = new double[ARRAY_SIZE];
-    auto * standardizedData = new double[ARRAY_SIZE];
-    auto * classesData = new int[ROWS];
+    auto * data = new double[DATA_SIZE];
+    auto * test = new double[TEST_SIZE];
+    auto * classesTrain = new int[8000];
+    auto * classesTest = new int[2000];
 
 
-    auto * test = new int[TEST_SIZE];
-    auto * normalizedTest = new double[TEST_SIZE];
-    auto * standardizedTest = new double[TEST_SIZE];
-    auto * classesTest = new int[ROWS_TEST];
-
-
-
-//    readData(data, classesData);
-//    print_arr(data);
-//    svaeClasses(classesData);
-//    readTest(test, classesTest);
+    readData(data, "norm_train.csv");
+    readData(test, "norm_test.csv");
+    readClasses(classesTrain, "classes_train.txt");
+    readClasses(classesTest, "classes_test.txt");
 
 //    print_arr(data);
+//    print_arr(test);
 
-
-
-
-//    standarize(data, standardizedData);
-//    writeFile(standardizedData);
-//    ROWS = ROWS_TEST;
-//    standarize(test, standardizedTest);
-
-//    double * test2D[ROWS_TEST];
-
+    knn(data, test, classesTrain, classesTest);
 
 
 
