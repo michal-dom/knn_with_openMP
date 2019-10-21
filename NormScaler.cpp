@@ -6,7 +6,7 @@
 
 int min(const int col, const int * array){
     int min_val = 255;
-#pragma omp parallel for reduction(min: min_val) num_threads(NUM_THREADS)
+    #pragma omp parallel for reduction(min: min_val) num_threads(NUM_THREADS)
     for(int i = 0; i < ROWS; i++){
         int index = (i*COLS) + col;
         if (min_val > array[index]){
@@ -35,7 +35,7 @@ void minMaxNormalization(const int col, const int * array, double * normalizedAr
     const int max_val = max(col, array);
     const double denominator = max_val - min_val;
 
-#pragma omp parallel for num_threads(NUM_THREADS) shared(normalizedArray)
+    #pragma omp parallel for num_threads(NUM_THREADS) shared(normalizedArray)
     for(int i = 0; i < ROWS; i++){
         int index = (i*COLS) + col;
         if(denominator == 0){
