@@ -10,7 +10,7 @@
 #include "StandScaler.h"
 #include "NormScaler.h"
 
-#define NUM_THREADS 3
+#define NUM_THREADS 2
 #define ROWS 8000
 #define COLS 784
 
@@ -42,11 +42,12 @@ void standarize(const int * array, double * normalizedArray){
 
 int euclidian(double * train, double * test, int testRow){
 
-    auto min = 1000000.0;
+    auto min = DBL_MAX;
     int classIndex = 0;
+//    #pragma omp parallel for num_threads(NUM_THREADS) private(classIndex, min)
     for(int i = 0; i < ROWS; i++){
         double sum = 0.0;
-
+//        #pragma omp parallel for num_threads(NUM_THREADS) private(sum)
         for(int j = 0; j < COLS; j++){
             int indexTrain = 784*i + j;
             int indexTest = 784*testRow + j;
@@ -61,10 +62,11 @@ int euclidian(double * train, double * test, int testRow){
     return classIndex;
 }
 
-void knn(double * train, double * test, int * classesTrain, int *  classesTest){
+void knn(double * train, double * test, const int * classesTrain, const int * classesTest){
 
 
     auto hits = 0;
+//    #pragma omp parallel for reduction(+: hits) num_threads(NUM_THREADS) shared(train, test, classesTrain, classesTest)
     for(int i = 0; i < 2000; i++){
         int predClass = classesTrain[euclidian(train, test, i)];
         if(predClass == classesTest[i]){
@@ -72,7 +74,7 @@ void knn(double * train, double * test, int * classesTrain, int *  classesTest){
         }
     }
 
-    double accuracy = (double) hits;
+    auto accuracy = (double) hits;
     accuracy = accuracy/20;
 
     cout << "Classifier accuracy is " << accuracy << "%." << endl;
@@ -96,7 +98,11 @@ int main() {
 //    print_arr(data);
 //    print_arr(test);
 
+    double startTime = omp_get_wtime();
     knn(data, test, classesTrain, classesTest);
+    double time = omp_get_wtime() - startTime;
+
+    cout << "Time: " << time << "\n";
 
 
 
