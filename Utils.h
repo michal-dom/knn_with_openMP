@@ -3,7 +3,7 @@
 
 #include <string>
 
-void readData(double * array, std::string fileName);
+void readData(int * array, std::string fileName);
 
 void readClasses(int * array, std::string fileName);
 

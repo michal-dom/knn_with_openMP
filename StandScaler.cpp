@@ -1,6 +1,6 @@
 
 #include <math.h>
-#include <omp.h>
+//#include <mpi.h>
 
 #define NUM_THREADS 3
 #define ROWS 60000
@@ -9,7 +9,6 @@
 double mean(const int col, const int * array){
     double sum = 0;
 
-#pragma omp parallel for reduction (+:sum) num_threads(NUM_THREADS)
     for(int i = 0; i < ROWS; i++){
         int index = (i*COLS) + col;
         sum += array[index];
@@ -22,7 +21,6 @@ double deviation(int col, const int * array){
     double sum = 0;
     const double mean_val = mean(col, array);
 
-#pragma omp parallel for reduction(+:sum) num_threads(NUM_THREADS)
     for(int i = 0; i < ROWS; i++){
         int index = (i*COLS) + col;
         sum += (array[index] - mean_val) * (array[index] - mean_val);
@@ -35,7 +33,6 @@ void standardization(int col, const int * array, double * standardizedArray){
     const double mean_val = mean(col, array);
     const double deviation_val = deviation(col, array);
 
-#pragma omp parallel for num_threads(NUM_THREADS)
     for(int i = 0; i < ROWS; i++){
 
         int index = (i*COLS) + col;

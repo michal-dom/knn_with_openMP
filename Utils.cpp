@@ -23,7 +23,7 @@ void readData(double * array, const string fileName){
 
 void print_arr(double * array){
     long k = 0;
-    for(int i = 0; i < 2000; i++){
+    for(int i = 0; i < 60000; i++){
         for(int j = 0; j < 784; j++){
             cout << array[k] << " ";
             k++;

@@ -1,7 +1,6 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include <omp.h>
 #include <stdio.h>
 #include <math.h>
 #include <cfloat>
@@ -17,7 +16,7 @@
 using namespace std;
 
 
-const long ARRAY_SIZE = ROWS * COLS;
+const long ARRAY_SIZE = 60000 * COLS;
 
 const long DATA_SIZE = 8000 * 784;
 const long TEST_SIZE = 2000 * 784;
@@ -26,15 +25,27 @@ const long TEST_SIZE = 2000 * 784;
 
 void normalize(const int * array, double * normalizedArray){
 
-    #pragma omp parallel for num_threads(NUM_THREADS) shared(normalizedArray)
-    for(int i = 0; i < COLS; i++){
-        minMaxNormalization(i, array, normalizedArray);
+    int part = COLS/NUM_THREADS;
+
+    MPI_Init(NULL, NULL);
+
+    int world_rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+    int world_size;
+    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+    for(int i = 0; i < part; i++){
+        int index = i + (part * world_rank);
+        minMaxNormalization(index, array, normalizedArray);
     }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Finalize();
+
+
 }
 
 void standarize(const int * array, double * normalizedArray){
 
-    #pragma omp parallel for num_threads(NUM_THREADS) shared(normalizedArray)
     for(int i = 0; i < COLS; i++){
         standardization(i, array, normalizedArray);
     }
@@ -46,10 +57,8 @@ int manhattan(double * train, double * test, int testRow){
     auto * voting = new double[10];
 
     int classIndex = 0;
-    #pragma omp parallel for num_threads(NUM_THREADS) shared(classIndex) reduction(min: minVal)
     for(int i = 0; i < ROWS; i++){
         double sum = 0.0;
-        #pragma omp parallel for num_threads(NUM_THREADS) reduction(+: sum)
         for(int j = 0; j < COLS; j++){
             int indexTrain = 784*i + j;
             int indexTest = 784*testRow + j;
@@ -67,11 +76,9 @@ int chebyshev(double * train, double * test, int testRow){
 
     auto minVal = DBL_MAX;
     int classIndex = 0;
-    #pragma omp parallel for num_threads(NUM_THREADS) shared(classIndex) reduction(min: minVal)
     for(int i = 0; i < ROWS; i++){
         double maxVal = 0.0;
 
-        #pragma omp parallel for num_threads(NUM_THREADS) reduction(max: maxVal)
         for(int j = 0; j < COLS; j++){
             int indexTrain = 784*i + j;
             int indexTest = 784*testRow + j;
@@ -93,10 +100,8 @@ int euclidian(double * train, double * test, int testRow){
 
     auto minVal = DBL_MAX;
     int classIndex = 0;
-    #pragma omp parallel for num_threads(NUM_THREADS) shared(classIndex) reduction(min: minVal)
     for(int i = 0; i < ROWS; i++){
         double sum = 0.0;
-        #pragma omp parallel for num_threads(NUM_THREADS) reduction(+: sum)
         for(int j = 0; j < COLS; j++){
             int indexTrain = 784*i + j;
             int indexTest = 784*testRow + j;
@@ -115,7 +120,6 @@ void knn(double * train, double * test, const int * classesTrain, const int * cl
 
 
     auto hits = 0;
-    #pragma omp parallel for reduction(+: hits) num_threads(NUM_THREADS) shared(train, test, classesTrain, classesTest)
     for(int i = 0; i < 2000; i++){
         int predClass = classesTrain[chebyshev(train, test, i)];
         if(predClass == classesTest[i]){
@@ -133,25 +137,30 @@ void knn(double * train, double * test, const int * classesTrain, const int * cl
 int main() {
 
 
-    auto * data = new double[DATA_SIZE];
-    auto * test = new double[TEST_SIZE];
-    auto * classesTrain = new int[8000];
-    auto * classesTest = new int[2000];
+
+    int * data = new int[ARRAY_SIZE];
+    auto * normal = new double[ARRAY_SIZE];
+    auto * classesTrain = new int[60000];
+//    auto * classesTest = new int[2000];
 
 
-    readData(data, "norm_train.csv");
-    readData(test, "norm_test.csv");
-    readClasses(classesTrain, "classes_train.txt");
-    readClasses(classesTest, "classes_test.txt");
+    readUnprocessed(data, classesTrain);
+
+    normalize(data, normal);
+    print_arr(normal);
+//    readData(test, "norm_test.csv");
+//    readClasses(classesTrain, "classes_train.txt");
+//    readClasses(classesTest, "classes_test.txt");
+
 
 //    print_arr(data);
 //    print_arr(test);
 
-    double startTime = omp_get_wtime();
-    knn(data, test, classesTrain, classesTest);
-    double time = omp_get_wtime() - startTime;
+//    double startTime = omp_get_wtime();
+//    knn(data, test, classesTrain, classesTest);
+//    double time = omp_get_wtime() - startTime;
 
-    cout << "Time: " << time << "\n";
+//    cout << "Time: " << time << "\n";
 
 
 
