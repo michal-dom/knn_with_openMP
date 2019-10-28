@@ -4,10 +4,12 @@
 #include <stdio.h>
 #include <math.h>
 #include <cfloat>
+#include <mpi.h>
 
-#include "Utils.h"
-#include "StandScaler.h"
-#include "NormScaler.h"
+
+//#include "Utils.h"
+//#include "StandScaler.h"
+//#include "NormScaler.h"
 
 #define NUM_THREADS 2
 #define ROWS 8000
@@ -21,7 +23,45 @@ const long ARRAY_SIZE = 60000 * COLS;
 const long DATA_SIZE = 8000 * 784;
 const long TEST_SIZE = 2000 * 784;
 
+int min(const int col, const int * array){
+    int min_val = 255;
 
+    for(int i = 0; i < ROWS; i++){
+        int index = (i*COLS) + col;
+        if (min_val > array[index]){
+            min_val = array[index];
+        }
+    }
+    return min_val;
+}
+
+int max(const int col, const int * array){
+    int max_val = 0;
+
+    for(int i = 0; i < ROWS; i++){
+        int index = (i*COLS) + col;
+        if (max_val < array[index]){
+            max_val = array[index];
+        }
+    }
+    return max_val;
+}
+
+void minMaxNormalization(const int col, const int * array, double * normalizedArray){
+
+    const int min_val = min(col, array);
+    const int max_val = max(col, array);
+    const double denominator = max_val - min_val;
+
+    for(int i = 0; i < ROWS; i++) {
+        int index = (i * COLS) + col;
+        if (denominator == 0) {
+            normalizedArray[index] = 0;
+        } else {
+            normalizedArray[index] = (array[index] - min_val) / denominator;
+        }
+    }
+}
 
 void normalize(const int * array, double * normalizedArray){
 
@@ -134,6 +174,40 @@ void knn(double * train, double * test, const int * classesTrain, const int * cl
 
 }
 
+void readUnprocessed(int * array, int * classes){
+    ifstream input("mnist_train.csv");
+
+    string foo;
+    getline( input, foo );
+
+    int j = 0;
+    int i = 0;
+    for(string line; getline( input, line ); ){
+        stringstream stream(line.substr(0, line.size() - 1));
+        string digit;
+        getline(stream, digit, ',');
+        classes[i] = strtol(digit.c_str(), nullptr, 0);
+        while( getline(stream, digit, ',') ) {
+            array[j] = strtol(digit.c_str(), nullptr, 0);
+            j++;
+        }
+        i++;
+    }
+
+    input.close();
+}
+
+void print_arr(double * array){
+    long k = 0;
+    for(int i = 0; i < 60000; i++){
+        for(int j = 0; j < 784; j++){
+            cout << array[k] << " ";
+            k++;
+        }
+        cout << endl;
+    }
+}
+
 int main() {
 
 
@@ -141,26 +215,13 @@ int main() {
     int * data = new int[ARRAY_SIZE];
     auto * normal = new double[ARRAY_SIZE];
     auto * classesTrain = new int[60000];
-//    auto * classesTest = new int[2000];
+
 
 
     readUnprocessed(data, classesTrain);
 
     normalize(data, normal);
     print_arr(normal);
-//    readData(test, "norm_test.csv");
-//    readClasses(classesTrain, "classes_train.txt");
-//    readClasses(classesTest, "classes_test.txt");
-
-
-//    print_arr(data);
-//    print_arr(test);
-
-//    double startTime = omp_get_wtime();
-//    knn(data, test, classesTrain, classesTest);
-//    double time = omp_get_wtime() - startTime;
-
-//    cout << "Time: " << time << "\n";
 
 
 
